@@ -1,4 +1,4 @@
-import React, {useEffect, useState, useRef} from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Platform,
   KeyboardAvoidingView,
@@ -27,7 +27,7 @@ import CameraSwitch from './src/assets/CameraSwitch';
 import IconContainer from './src/components/IconContainer';
 import InCallManager from 'react-native-incall-manager';
 
-export default function App({}) {
+export default function App({ }) {
   const [localStream, setlocalStream] = useState(null);
 
   const [remoteStream, setRemoteStream] = useState(null);
@@ -39,7 +39,7 @@ export default function App({}) {
   );
   const otherUserId = useRef(null);
 
-  const socket = SocketIOClient('http://192.168.43.179:3500', {
+  const socket = SocketIOClient('http://192.168.8.198:3500', {
     transports: ['websocket'],
     query: {
       callerId,
@@ -87,19 +87,19 @@ export default function App({}) {
       let message = data.rtcMessage;
 
       if (peerConnection.current) {
-        peerConnection?.current
+        peerConnection.current
           .addIceCandidate(
             new RTCIceCandidate({
               candidate: message.candidate,
               sdpMid: message.id,
               sdpMLineIndex: message.label,
-            }),
+            })
           )
-          .then(data => {
-            console.log('SUCCESS');
+          .then(() => {
+            console.log('Successfully added ICE candidate');
           })
-          .catch(err => {
-            console.log('Error', err);
+          .catch(error => {
+            console.error('Error adding ICE candidate:', error);
           });
       }
     });
@@ -128,24 +128,35 @@ export default function App({}) {
               minFrameRate: 30,
             },
             facingMode: isFront ? 'user' : 'environment',
-            optional: videoSourceId ? [{sourceId: videoSourceId}] : [],
+            optional: videoSourceId ? [{ sourceId: videoSourceId }] : [],
           },
         })
         .then(stream => {
-
           setlocalStream(stream);
 
-          peerConnection.current.addStream(stream);
+          console.log('User media stream:', stream);
+
+          peerConnection.current.getSenders().forEach(sender => {
+            peerConnection.current.removeTrack(sender);
+          });
+
+          console.log('Existing tracks in RTCPeerConnection before adding:', peerConnection.current.getSenders());
+
+          stream.getTracks().forEach(track => {
+            peerConnection.current.addTrack(track, stream);
+          });
+
+          console.log('Existing tracks in RTCPeerConnection after adding:', peerConnection.current.getSenders());
         })
         .catch(error => {
+          console.error('Error getting user media:', error);
         });
     });
 
-    peerConnection.current.onaddstream = event => {
-      setRemoteStream(event.stream);
+    peerConnection.current.ontrack = event => {
+      setRemoteStream(event.streams[0]);
     };
 
-    // Setup ice handling
     peerConnection.current.onicecandidate = event => {
       if (event.candidate) {
         sendICEcandidate({
@@ -449,14 +460,14 @@ export default function App({}) {
           paddingHorizontal: 12,
           paddingVertical: 12,
         }}>
-        {localStream ? (
+        {localStream && (
           <RTCView
             objectFit={'cover'}
-            style={{flex: 1, backgroundColor: '#050A0E'}}
+            style={{ flex: 1, backgroundColor: '#050A0E' }}
             streamURL={localStream.toURL()}
           />
-        ) : null}
-        {remoteStream ? (
+        )}
+        {remoteStream && (
           <RTCView
             objectFit={'cover'}
             style={{
@@ -466,7 +477,7 @@ export default function App({}) {
             }}
             streamURL={remoteStream.toURL()}
           />
-        ) : null}
+        )}
         <View
           style={{
             marginVertical: 12,
